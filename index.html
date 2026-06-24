@@ -2278,8 +2278,16 @@ const App={
     detailBook=b;galIndex=0;
     $("detailBody").innerHTML=this.detailHTML(b);
     $("detailScrim").classList.add("open");document.body.style.overflow="hidden";
+    // atualiza a URL sem recarregar a página
+    const url=new URL(location.href);url.searchParams.set("anuncio",id);
+    history.replaceState(null,"",url.toString());
   },
-  closeDetail(){$("detailScrim").classList.remove("open");document.body.style.overflow="";detailBook=null;},
+  closeDetail(){
+    $("detailScrim").classList.remove("open");document.body.style.overflow="";detailBook=null;
+    // remove o parâmetro da URL ao fechar
+    const url=new URL(location.href);url.searchParams.delete("anuncio");
+    history.replaceState(null,"",url.toString());
+  },
   gal(dir){
     if(!detailBook?.fotos?.length)return;
     const n=detailBook.fotos.length;galIndex=(galIndex+dir+n)%n;
@@ -2434,6 +2442,7 @@ const App={
 
   /* ---------- compartilhar anúncio ---------- */
   _shareBook:null,
+  _deepLinkHandled:false,
   shareLink(b){
     // Gera uma URL com hash contendo o ID do anúncio, usando a URL atual como base
     const base=location.href.split("#")[0].split("?")[0];
@@ -2564,6 +2573,12 @@ if(!isConfigured){
         });
         $("loadingState").classList.add("hide");
         App.render();
+        // deep-link: abre o anúncio indicado na URL (só na primeira carga)
+        if(!App._deepLinkHandled){
+          App._deepLinkHandled=true;
+          const pid=new URLSearchParams(location.search).get("anuncio");
+          if(pid && BOOKS.find(x=>x.id===pid)) App.openDetail(pid);
+        }
       },err=>{
         console.error(err);
         $("loadingState").classList.add("hide");
