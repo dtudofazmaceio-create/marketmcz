@@ -219,6 +219,33 @@
     display:inline-flex;align-items:center;font-weight:600;font-size:14px;color:var(--ink)}
   .fav-btn.detail.on{color:var(--danger);border-color:var(--danger-soft);background:var(--danger-soft)}
 
+  /* ---------- compartilhar ---------- */
+  .share-btn{position:absolute;top:11px;right:53px;width:36px;height:36px;border-radius:50%;z-index:3;
+    background:rgba(255,255,255,.92);border:1px solid var(--line);display:grid;place-items:center;
+    color:var(--ink-soft);box-shadow:var(--shadow);transition:transform .1s,color .15s,background .15s}
+  .share-btn:hover{transform:scale(1.08);color:var(--ink)}
+  .share-btn svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2}
+  .share-menu{position:fixed;z-index:200;background:var(--surface);border:1px solid var(--line);
+    border-radius:16px;box-shadow:var(--shadow-lg);padding:8px;min-width:200px;
+    animation:pop .15s ease;display:none}
+  .share-menu.open{display:block}
+  .share-menu-item{display:flex;align-items:center;gap:11px;padding:11px 14px;border-radius:10px;
+    border:none;background:none;width:100%;text-align:left;font-family:inherit;font-size:14.5px;
+    font-weight:600;color:var(--ink);cursor:pointer;transition:background .12s}
+  .share-menu-item:hover{background:var(--surface-2)}
+  .share-menu-item svg{width:19px;height:19px;flex:none}
+  .share-menu-item.wa{color:var(--wa)}
+  .share-menu-item.wa:hover{background:var(--trade-soft)}
+  .share-menu-item.copy.copied{color:var(--trade)}
+  .share-menu-divider{height:1px;background:var(--line);margin:4px 0}
+  .share-scrim{position:fixed;inset:0;z-index:199;display:none}
+  .share-scrim.open{display:block}
+  /* botão de compartilhar no detalhe (ao lado do favoritar) */
+  .share-btn-detail{position:static;width:auto;height:auto;border-radius:11px;padding:11px 16px;gap:8px;
+    display:inline-flex;align-items:center;font-weight:600;font-size:14px;color:var(--ink);
+    background:var(--surface);border:1px solid var(--line-strong)}
+  .share-btn-detail:hover{background:var(--surface-2)}
+
   /* owner tag */
   .owner-row{display:flex;gap:8px;padding:0 16px 4px}
   .owner-actions{display:flex;gap:8px;width:100%;flex-wrap:wrap}
@@ -2197,6 +2224,9 @@ const App={
     const favBtn=`<button class="fav-btn${this.isFav(b.id)?' on':''}" data-id="${b.id}" onclick="App.toggleFav('${b.id}',event)" aria-label="Favoritar" title="Favoritar">
         <svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1L12 21l7.7-7.6 1.1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
       </button>`;
+    const shareCardBtn=`<button class="share-btn" onclick="App.openShareMenu('${b.id}',event)" aria-label="Compartilhar" title="Compartilhar">
+        <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>
+      </button>`;
     const encLabel=pendente?"Em análise":reprovado?"Não aprovado":"Anúncio encerrado";
     const footHTML=encerrado
       ? `<div class="mini" style="flex:1;justify-content:center;background:var(--surface-2);color:var(--ink-soft);cursor:default">${encLabel}</div>`
@@ -2219,6 +2249,7 @@ const App={
           <span class="badge ${b.tipo}">${tipoLabel(b.tipo)}</span>
           ${statusBadge}
           ${favBtn}
+          ${shareCardBtn}
           ${cover}
         </div>
         <div class="card-body">
@@ -2386,16 +2417,73 @@ const App={
       <div class="detail-section-title">Informações</div>
       ${infoGrid}
       ${b.descricao?`<div class="detail-section-title">Descrição</div><div class="detail-desc">${escapeHtml(b.descricao)}</div>`:""}
-      <div style="margin-top:16px">
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
         <button class="fav-btn detail${this.isFav(b.id)?' on':''}" data-id="${b.id}" onclick="App.toggleFav('${b.id}',event)">
           <svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1L12 21l7.7-7.6 1.1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
           <span>${this.isFav(b.id)?"Nos seus favoritos":"Adicionar aos favoritos"}</span>
+        </button>
+        <button class="share-btn-detail" onclick="App.openShareMenu('${b.id}',event)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:17px;height:17px;flex:none"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>
+          Compartilhar
         </button>
       </div>
       ${waBlock}
       ${ownerBlock}`;
   },
   openDetailEdit(){const b=detailBook;this.closeDetail();this.openForm(b);},
+
+  /* ---------- compartilhar anúncio ---------- */
+  _shareBook:null,
+  shareLink(b){
+    // Gera uma URL com hash contendo o ID do anúncio, usando a URL atual como base
+    const base=location.href.split("#")[0].split("?")[0];
+    return `${base}?anuncio=${b.id}`;
+  },
+  openShareMenu(id,event){
+    event.stopPropagation();
+    const b=BOOKS.find(x=>x.id===id);if(!b)return;
+    this._shareBook=b;
+    const menu=$("shareMenu");
+    $("shareCopyLabel").textContent="Copiar link";
+    $("shareCopy").classList.remove("copied");
+    menu.classList.add("open");
+    // posiciona o menu perto do botão
+    const btn=event.currentTarget;
+    const r=btn.getBoundingClientRect();
+    const mw=210;
+    let left=r.left;
+    if(left+mw>window.innerWidth-12) left=window.innerWidth-mw-12;
+    let top=r.bottom+6;
+    if(top+120>window.innerHeight) top=r.top-126;
+    menu.style.left=left+"px";
+    menu.style.top=top+"px";
+  },
+  closeShareMenu(){
+    $("shareMenu").classList.remove("open");
+  },
+  shareViaWhatsapp(){
+    const b=this._shareBook;if(!b)return;
+    const link=this.shareLink(b);
+    const msg=`Confira esse anúncio no Market MCZ: *${b.titulo}*\n${link}`;
+    window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank","noopener");
+    this.closeShareMenu();
+  },
+  async shareViaCopy(){
+    const b=this._shareBook;if(!b)return;
+    const link=this.shareLink(b);
+    try{
+      await navigator.clipboard.writeText(link);
+    }catch(e){
+      // fallback
+      const ta=document.createElement("textarea");
+      ta.value=link;ta.style.position="fixed";ta.style.opacity="0";
+      document.body.appendChild(ta);ta.select();document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    $("shareCopyLabel").textContent="Link copiado!";
+    $("shareCopy").classList.add("copied");
+    setTimeout(()=>this.closeShareMenu(),1200);
+  },
 };
 window.App=App;
 
@@ -2419,6 +2507,13 @@ $("formScrim").addEventListener("click",e=>{if(e.target===$("formScrim"))App.clo
 $("detailScrim").addEventListener("click",e=>{if(e.target===$("detailScrim"))App.closeDetail();});
 $("finishScrim").addEventListener("click",e=>{if(e.target===$("finishScrim"))App.closeFinish();});
 $("regScrim").addEventListener("click",e=>{if(e.target===$("regScrim"))App.closeRegister();});
+
+/* ---- compartilhar: fecha menu ao clicar fora ---- */
+document.addEventListener("click",e=>{
+  if(!e.target.closest(".share-menu")&&!e.target.closest(".share-btn")&&!e.target.closest(".share-btn-detail")){
+    App.closeShareMenu();
+  }
+});
 
 /* reajusta o texto dos banners ao redimensionar a janela/girar o celular,
    para o overlay continuar cabendo em uma única linha */
@@ -2510,6 +2605,19 @@ if(!isConfigured){
   }
 }
 </script>
+
+<!-- menu de compartilhar (global, reposicionado via JS) -->
+<div id="shareMenu" class="share-menu" role="menu" aria-label="Compartilhar anúncio">
+  <button class="share-menu-item wa" id="shareWa" onclick="App.shareViaWhatsapp()">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.2-1.7-.8-2-.9-.3-.1-.5-.2-.6.2-.2.3-.7.9-.8 1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-.8-2c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.3s1 2.7 1.1 2.9c.1.2 2 3.1 4.9 4.3.7.3 1.2.5 1.6.6.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3z"/><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2z"/></svg>
+    Compartilhar no WhatsApp
+  </button>
+  <div class="share-menu-divider"></div>
+  <button class="share-menu-item copy" id="shareCopy" onclick="App.shareViaCopy()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    <span id="shareCopyLabel">Copiar link</span>
+  </button>
+</div>
 
 <script>
 /* ============================================================
